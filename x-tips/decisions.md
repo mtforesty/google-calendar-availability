@@ -6,3 +6,4 @@
 | 2026-10-07 | [噛みくだくん: Claude×Obsidian 第二の脳](https://x.com/kamikudaku_wani/status/2082434322481774982) | 採用 | vault構成とCLAUDE.mdテンプレ → `vault/`、毎朝のブリーフ → `/daily-brief`、週次の対話 → `/weekly-review`、入れる手間の削減 → `/capture`。Readwise/Airr/Whisper/Telegram/N8Nは登録が必要なため見送り。LINEオプチャ誘導は宣伝のため対象外 |
 | 2026-10-07 | (変更) 第二の脳のメモ元 | 変更 | ユーザー指示でメモ元を「自分が編集した Notion ページ」に変更。リポジトリが public のため、メモ・ブリーフは Notion にのみ置き、`vault/` は廃止 |
 | 2026-10-07 | [よん: Claude Codeの教科書](https://x.com/4on_yon_x/status/2107692623934980258) | 部分採用 | `/check-change` を追加。`/dev-flow` に調査フェーズ・受け入れ条件・やらないこと・異常系の検討・小さく縦に作る・再現テスト先行・3回失敗で停止を追加。CLAUDE.md に開発の約束を追加。Hooks(検査コマンド未確定のため想像で書かない)、opusplan、worktree、プロパティベーステスト、モデル比較評価は今の規模では不要として見送り |
+| 2026-10-08 | X投稿「凍った手記」(HTML/Three.js × Gemini TTS × ffmpeg、URL不明) | 採用 | マーケ動画に使いたいとのことで `/motion-video` スキルと `motion-video/`(コマ送り書き出し render.mjs、Gemini TTS の tts.mjs、ffmpeg 効果音 sfx.sh、サンプルシーン)を実装。書き出しは動作確認済み、TTS は API キー未設定のため未確認 |

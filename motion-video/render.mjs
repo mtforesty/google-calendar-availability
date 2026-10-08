@@ -2,6 +2,7 @@
 //
 // 使い方:
 //   node render.mjs scenes/example.html out/example.mp4 [--audio a.wav --audio b.wav] [--width 1080 --height 1920] [--fps 30]
+//   node render.mjs scenes/telop.html out/telop.mov --alpha   … 透明背景のテロップ層
 //
 // シーン側の約束:
 //   window.SCENE = { duration: 秒 }       … 動画の長さ
@@ -11,7 +12,7 @@ import { chromium } from "playwright";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync, createReadStream } from "node:fs";
 import path from "node:path";
 
 const args = process.argv.slice(2);
@@ -28,14 +29,26 @@ if (!scene || !out) {
 const width = Number(opt("width", 1920));
 const height = Number(opt("height", 1080));
 const fps = Number(opt("fps", 30));
+// --alpha: 背景を透明にして .mov(PNGコーデック)で書き出す。実写の上に重ねるテロップ層に使う
+const alpha = args.includes("--alpha");
 
 // three を node_modules から import できるよう、このフォルダを配信する
 const root = path.dirname(new URL(import.meta.url).pathname);
-const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".json": "application/json" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".json": "application/json", ".webm": "video/webm" };
 const server = createServer(async (req, res) => {
   const p = path.join(root, decodeURIComponent(new URL(req.url, "http://x").pathname));
   if (!p.startsWith(root) || !existsSync(p)) return res.writeHead(404).end();
-  res.writeHead(200, { "content-type": types[path.extname(p)] ?? "application/octet-stream" });
+  const type = types[path.extname(p)] ?? "application/octet-stream";
+  // <video> のシークには Range 対応が要る
+  const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? "");
+  if (range) {
+    const size = statSync(p).size;
+    const start = range[1] ? Number(range[1]) : size - Number(range[2]);
+    const end = range[1] && range[2] ? Number(range[2]) : size - 1;
+    res.writeHead(206, { "content-type": type, "accept-ranges": "bytes", "content-range": `bytes ${start}-${end}/${size}`, "content-length": end - start + 1 });
+    return createReadStream(p, { start, end }).pipe(res);
+  }
+  res.writeHead(200, { "content-type": type, "accept-ranges": "bytes" });
   res.end(await readFile(p));
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -56,14 +69,14 @@ const ff = spawn("ffmpeg", [
   "-f", "image2pipe", "-framerate", String(fps), "-i", "-",
   ...audios.flatMap((a) => ["-i", a]),
   ...(audios.length > 1 ? ["-filter_complex", `${audios.map((_, i) => `[${i + 1}:a]`).join("")}amix=inputs=${audios.length}:normalize=0[a]`, "-map", "0:v", "-map", "[a]"] : []),
-  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
+  ...(alpha ? ["-c:v", "png", "-pix_fmt", "rgba"] : ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20"]),
   ...(audios.length ? ["-c:a", "aac", "-b:a", "192k"] : []),
-  "-t", String(duration), "-movflags", "+faststart", out,
+  "-t", String(duration), ...(alpha ? [] : ["-movflags", "+faststart"]), out,
 ], { stdio: ["pipe", "inherit", "inherit"] });
 
 for (let f = 0; f < frames; f++) {
   await page.evaluate((t) => window.renderAt(t), f / fps);
-  const png = await page.screenshot({ type: "png" });
+  const png = await page.screenshot({ type: "png", omitBackground: alpha });
   if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once("drain", r));
   if (f % fps === 0) process.stdout.write(`\r${f}/${frames} frames`);
 }
